@@ -11,6 +11,7 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	openngfwv1 "github.com/detailtech/oss-ngfw/api/gen/openngfw/v1"
+	"github.com/detailtech/oss-ngfw/internal/authz"
 	"github.com/detailtech/oss-ngfw/internal/engines"
 	"github.com/detailtech/oss-ngfw/internal/policy"
 	"github.com/detailtech/oss-ngfw/internal/store"
@@ -42,9 +43,9 @@ func NewPolicyServer(st *store.Store, sup *engines.Supervisor, render Pipeline) 
 	return &PolicyServer{store: st, sup: sup, render: render}
 }
 
-// actor identifies the caller for audit purposes. Until M5 authn lands,
-// every caller is the local administrator.
-func actor(_ context.Context) string { return "local" }
+// actor identifies the caller for audit purposes: the authenticated
+// user when auth is enabled, "local" otherwise.
+func actor(ctx context.Context) string { return authz.Actor(ctx) }
 
 // GetPolicy returns the running, candidate, or a historical policy.
 func (s *PolicyServer) GetPolicy(_ context.Context, req *openngfwv1.GetPolicyRequest) (*openngfwv1.GetPolicyResponse, error) {

@@ -26,11 +26,13 @@ import (
 
 	openngfwv1 "github.com/detailtech/oss-ngfw/api/gen/openngfw/v1"
 	"github.com/detailtech/oss-ngfw/internal/apiserver"
+	"github.com/detailtech/oss-ngfw/internal/authz"
 	"github.com/detailtech/oss-ngfw/internal/engines"
 	"github.com/detailtech/oss-ngfw/internal/intel"
 	"github.com/detailtech/oss-ngfw/internal/renderers"
 	"github.com/detailtech/oss-ngfw/internal/store"
 	"github.com/detailtech/oss-ngfw/internal/version"
+	"github.com/detailtech/oss-ngfw/internal/webui"
 )
 
 func main() {
@@ -40,6 +42,7 @@ func main() {
 	dataDir := flag.String("data-dir", "/var/lib/openngfw", "state directory (store, rendered configs)")
 	logDir := flag.String("log-dir", "/var/log/openngfw", "engine log directory (eve.json)")
 	dryRun := flag.Bool("dry-run", false, "render and validate but never touch engines (dev/demo)")
+	usersFile := flag.String("users-file", "", "local API users file enabling token auth + RBAC (YAML; chmod 600)")
 	flag.Parse()
 
 	if *showVersion {
@@ -47,13 +50,13 @@ func main() {
 		return
 	}
 
-	if err := run(*grpcListen, *httpListen, *dataDir, *logDir, *dryRun); err != nil {
+	if err := run(*grpcListen, *httpListen, *dataDir, *logDir, *usersFile, *dryRun); err != nil {
 		slog.Error("controld exited", "error", err)
 		os.Exit(1)
 	}
 }
 
-func run(grpcListen, httpListen, dataDir, logDir string, dryRun bool) error {
+func run(grpcListen, httpListen, dataDir, logDir, usersFile string, dryRun bool) error {
 	if err := os.MkdirAll(dataDir, 0o755); err != nil {
 		return fmt.Errorf("create data dir: %w", err)
 	}
@@ -115,7 +118,19 @@ func run(grpcListen, httpListen, dataDir, logDir string, dryRun bool) error {
 		}
 	}
 
-	srv := grpc.NewServer()
+	var serverOpts []grpc.ServerOption
+	if usersFile != "" {
+		auth, err := authz.Load(usersFile)
+		if err != nil {
+			return fmt.Errorf("load users file: %w", err)
+		}
+		serverOpts = append(serverOpts, grpc.UnaryInterceptor(auth.UnaryInterceptor()))
+		slog.Info("API authentication enabled", "users_file", usersFile)
+	} else {
+		slog.Warn("API authentication is DISABLED (no --users-file); every caller is 'local' admin — do not expose the API off-host")
+	}
+
+	srv := grpc.NewServer(serverOpts...)
 	openngfwv1.RegisterSystemServiceServer(srv, &apiserver.SystemService{})
 	openngfwv1.RegisterPolicyServiceServer(srv, policyServer)
 	openngfwv1.RegisterAlertServiceServer(srv, &apiserver.AlertServer{EvePath: opts.EvePath()})
@@ -146,7 +161,16 @@ func run(grpcListen, httpListen, dataDir, logDir string, dryRun bool) error {
 		if err := openngfwv1.RegisterFlowServiceHandlerFromEndpoint(ctx, mux, grpcListen, dialOpts); err != nil {
 			return fmt.Errorf("register flow gateway: %w", err)
 		}
-		httpSrv = &http.Server{Addr: httpListen, Handler: mux, ReadHeaderTimeout: 10 * time.Second}
+		root := http.NewServeMux()
+		root.Handle("/ui/", webui.Handler())
+		root.Handle("/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.URL.Path == "/" {
+				http.Redirect(w, r, "/ui/", http.StatusFound)
+				return
+			}
+			mux.ServeHTTP(w, r)
+		}))
+		httpSrv = &http.Server{Addr: httpListen, Handler: root, ReadHeaderTimeout: 10 * time.Second}
 		go func() {
 			if err := httpSrv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 				errCh <- fmt.Errorf("http gateway: %w", err)
