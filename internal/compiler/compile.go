@@ -76,6 +76,13 @@ func Compile(p *openngfwv1.Policy) (*IR, error) {
 		ir.Routes = append(ir.Routes, route)
 	}
 
+	ids, err := compileIDs(p)
+	if err != nil {
+		return nil, err
+	}
+	ir.IDs = ids
+	ir.Telemetry = compileTelemetry(p)
+
 	return ir, nil
 }
 
@@ -263,4 +270,61 @@ func compileRoute(sr *openngfwv1.StaticRoute) (RouteIR, error) {
 	out.Interface = sr.GetInterface()
 	out.Metric = sr.GetMetric()
 	return out, nil
+}
+
+// rfc1918 is the default HOME_NET when policy doesn't specify one.
+var rfc1918 = []netip.Prefix{
+	netip.MustParsePrefix("10.0.0.0/8"),
+	netip.MustParsePrefix("172.16.0.0/12"),
+	netip.MustParsePrefix("192.168.0.0/16"),
+}
+
+func compileIDs(p *openngfwv1.Policy) (*IDsIR, error) {
+	ids := p.GetIds()
+	if !ids.GetEnabled() {
+		return nil, nil
+	}
+	out := &IDsIR{
+		Prevent:  ids.GetMode() == openngfwv1.IdsMode_IDS_MODE_PREVENT,
+		QueueNum: uint16(ids.GetQueueNum()),
+	}
+	out.Interfaces = ids.GetMonitorInterfaces()
+	if len(out.Interfaces) == 0 {
+		for _, z := range p.GetZones() {
+			out.Interfaces = append(out.Interfaces, z.GetInterfaces()...)
+		}
+	}
+	if !out.Prevent && len(out.Interfaces) == 0 {
+		return nil, fmt.Errorf("ids: detect mode needs zone interfaces or monitor_interfaces")
+	}
+	for _, hn := range ids.GetHomeNetworks() {
+		pfx, err := netip.ParsePrefix(hn)
+		if err != nil {
+			return nil, fmt.Errorf("ids: invalid home network %q", hn)
+		}
+		out.HomeNets = append(out.HomeNets, pfx)
+	}
+	if len(out.HomeNets) == 0 {
+		out.HomeNets = rfc1918
+	}
+	out.RuleFiles = ids.GetRuleFiles()
+	if len(out.RuleFiles) == 0 {
+		out.RuleFiles = []string{"local.rules"}
+	}
+	return out, nil
+}
+
+func compileTelemetry(p *openngfwv1.Policy) *TelemetryIR {
+	tel := p.GetTelemetry()
+	if !tel.GetEnabled() {
+		return nil
+	}
+	out := &TelemetryIR{ClickHouseURL: tel.GetClickhouseUrl(), Database: tel.GetDatabase()}
+	if out.ClickHouseURL == "" {
+		out.ClickHouseURL = "http://127.0.0.1:8123"
+	}
+	if out.Database == "" {
+		out.Database = "openngfw"
+	}
+	return out
 }

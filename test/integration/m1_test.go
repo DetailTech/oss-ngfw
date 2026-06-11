@@ -139,7 +139,8 @@ func newStack(t *testing.T) *apiserver.PolicyServer {
 		&engines.Nftables{StateDir: dir},
 		&engines.Routes{StateDir: dir},
 	)
-	return apiserver.NewPolicyServer(st, sup, renderers.RenderAll)
+	opts := renderers.DefaultOptions(dir, dir+"/log")
+	return apiserver.NewPolicyServer(st, sup, renderers.Pipeline(opts))
 }
 
 func allowPolicy() *openngfwv1.Policy {

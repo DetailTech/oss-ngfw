@@ -4,7 +4,9 @@ import (
 	"flag"
 	"net/netip"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"google.golang.org/protobuf/encoding/protojson"
@@ -75,5 +77,30 @@ func TestRenderRejectsDisjointFamilies(t *testing.T) {
 	}}}
 	if _, err := Render(ir); err == nil {
 		t.Fatal("expected error for v4-source/v6-destination rule")
+	}
+}
+
+// TestGoldensPassNftCheck validates every golden ruleset with the real
+// nft binary when present. Queue statements need kernel NFQUEUE support;
+// kernels without it get a logged skip for those files only.
+func TestGoldensPassNftCheck(t *testing.T) {
+	bin, err := exec.LookPath("nft")
+	if err != nil {
+		t.Skip("nft not installed")
+	}
+	goldens, _ := filepath.Glob(filepath.Join("testdata", "*.nft"))
+	if len(goldens) == 0 {
+		t.Fatal("no golden files")
+	}
+	for _, g := range goldens {
+		t.Run(filepath.Base(g), func(t *testing.T) {
+			out, err := exec.Command(bin, "-c", "-f", g).CombinedOutput()
+			if err != nil {
+				if strings.Contains(string(out), "queue") && strings.Contains(string(out), "No such file or directory") {
+					t.Skipf("kernel lacks NFQUEUE support; cannot kernel-validate %s here", g)
+				}
+				t.Fatalf("nft -c rejected %s: %v\n%s", g, err, out)
+			}
+		})
 	}
 }

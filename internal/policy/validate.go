@@ -6,7 +6,9 @@ package policy
 import (
 	"fmt"
 	"net/netip"
+	"net/url"
 	"regexp"
+	"strings"
 
 	openngfwv1 "github.com/detailtech/oss-ngfw/api/gen/openngfw/v1"
 )
@@ -34,6 +36,8 @@ func Validate(p *openngfwv1.Policy) []string {
 	v.checkRules(p.GetRules())
 	v.checkNat(p.GetNat())
 	v.checkRoutes(p.GetStaticRoutes())
+	v.checkIDs(p.GetIds())
+	v.checkTelemetry(p.GetTelemetry())
 	return v.errs
 }
 
@@ -263,5 +267,42 @@ func (v *validator) checkRoutes(routes []*openngfwv1.StaticRoute) {
 				v.errf("%s: invalid via address %q", ctx, r.GetVia())
 			}
 		}
+	}
+}
+
+func (v *validator) checkIDs(ids *openngfwv1.Ids) {
+	if !ids.GetEnabled() {
+		return
+	}
+	if ids.GetMode() == openngfwv1.IdsMode_IDS_MODE_UNSPECIFIED {
+		v.errf("ids: mode must be set when enabled")
+	}
+	for _, hn := range ids.GetHomeNetworks() {
+		if _, err := netip.ParsePrefix(hn); err != nil {
+			v.errf("ids: invalid home network CIDR %q", hn)
+		}
+	}
+	for _, rf := range ids.GetRuleFiles() {
+		if rf == "" || strings.Contains(rf, "..") || strings.HasPrefix(rf, "/") {
+			v.errf("ids: rule file %q must be a relative path inside the rules directory", rf)
+		}
+	}
+	if ids.GetQueueNum() > 65535 {
+		v.errf("ids: queue_num %d out of range", ids.GetQueueNum())
+	}
+}
+
+func (v *validator) checkTelemetry(tel *openngfwv1.Telemetry) {
+	if !tel.GetEnabled() {
+		return
+	}
+	if u := tel.GetClickhouseUrl(); u != "" {
+		parsed, err := url.Parse(u)
+		if err != nil || (parsed.Scheme != "http" && parsed.Scheme != "https") || parsed.Host == "" {
+			v.errf("telemetry: clickhouse_url %q must be an http(s) URL", u)
+		}
+	}
+	if db := tel.GetDatabase(); db != "" && !nameRE.MatchString(db) {
+		v.errf("telemetry: database %q is not a valid name", db)
 	}
 }

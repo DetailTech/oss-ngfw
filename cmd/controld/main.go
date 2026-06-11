@@ -36,6 +36,7 @@ func main() {
 	grpcListen := flag.String("listen", "127.0.0.1:9443", "gRPC listen address")
 	httpListen := flag.String("http-listen", "127.0.0.1:8080", "REST gateway listen address (empty disables)")
 	dataDir := flag.String("data-dir", "/var/lib/openngfw", "state directory (store, rendered configs)")
+	logDir := flag.String("log-dir", "/var/log/openngfw", "engine log directory (eve.json)")
 	dryRun := flag.Bool("dry-run", false, "render and validate but never touch engines (dev/demo)")
 	flag.Parse()
 
@@ -44,13 +45,13 @@ func main() {
 		return
 	}
 
-	if err := run(*grpcListen, *httpListen, *dataDir, *dryRun); err != nil {
+	if err := run(*grpcListen, *httpListen, *dataDir, *logDir, *dryRun); err != nil {
 		slog.Error("controld exited", "error", err)
 		os.Exit(1)
 	}
 }
 
-func run(grpcListen, httpListen, dataDir string, dryRun bool) error {
+func run(grpcListen, httpListen, dataDir, logDir string, dryRun bool) error {
 	if err := os.MkdirAll(dataDir, 0o755); err != nil {
 		return fmt.Errorf("create data dir: %w", err)
 	}
@@ -60,17 +61,27 @@ func run(grpcListen, httpListen, dataDir string, dryRun bool) error {
 	}
 	defer func() { _ = st.Close() }()
 
+	opts := renderers.DefaultOptions(dataDir, logDir)
+
 	var sup *engines.Supervisor
 	if dryRun {
 		slog.Warn("running in dry-run mode: engine changes are NOT applied")
 		sup = engines.NewSupervisor(
 			&engines.DryRun{EngineName: engines.NftablesName},
 			&engines.DryRun{EngineName: engines.RoutesName},
+			&engines.DryRun{EngineName: engines.SuricataName},
+			&engines.DryRun{EngineName: engines.VectorName},
 		)
 	} else {
+		suricata := &engines.Suricata{StateDir: filepath.Join(dataDir, "suricata"), LogDir: logDir}
+		vector := &engines.Vector{StateDir: filepath.Join(dataDir, "vector")}
+		defer suricata.Stop()
+		defer vector.Stop()
 		sup = engines.NewSupervisor(
 			&engines.Nftables{StateDir: dataDir},
 			&engines.Routes{StateDir: dataDir},
+			suricata,
+			vector,
 		)
 	}
 
@@ -81,7 +92,8 @@ func run(grpcListen, httpListen, dataDir string, dryRun bool) error {
 
 	srv := grpc.NewServer()
 	openngfwv1.RegisterSystemServiceServer(srv, &apiserver.SystemService{})
-	openngfwv1.RegisterPolicyServiceServer(srv, apiserver.NewPolicyServer(st, sup, renderers.RenderAll))
+	openngfwv1.RegisterPolicyServiceServer(srv, apiserver.NewPolicyServer(st, sup, renderers.Pipeline(opts)))
+	openngfwv1.RegisterAlertServiceServer(srv, &apiserver.AlertServer{EvePath: opts.EvePath()})
 
 	errCh := make(chan error, 2)
 	go func() { errCh <- srv.Serve(lis) }()
@@ -97,6 +109,9 @@ func run(grpcListen, httpListen, dataDir string, dryRun bool) error {
 		}
 		if err := openngfwv1.RegisterPolicyServiceHandlerFromEndpoint(ctx, mux, grpcListen, dialOpts); err != nil {
 			return fmt.Errorf("register policy gateway: %w", err)
+		}
+		if err := openngfwv1.RegisterAlertServiceHandlerFromEndpoint(ctx, mux, grpcListen, dialOpts); err != nil {
+			return fmt.Errorf("register alert gateway: %w", err)
 		}
 		httpSrv = &http.Server{Addr: httpListen, Handler: mux, ReadHeaderTimeout: 10 * time.Second}
 		go func() {

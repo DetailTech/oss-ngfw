@@ -10,11 +10,13 @@ import "net/netip"
 // expanded to concrete values, disabled rules are dropped, and wildcard
 // ("any") matches are represented as empty slices.
 type IR struct {
-	Zones  []ZoneIR
-	Rules  []RuleIR
-	SNAT   []SNATIR
-	DNAT   []DNATIR
-	Routes []RouteIR
+	Zones     []ZoneIR
+	Rules     []RuleIR
+	SNAT      []SNATIR
+	DNAT      []DNATIR
+	Routes    []RouteIR
+	IDs       *IDsIR
+	Telemetry *TelemetryIR
 }
 
 // ZoneIR is a zone with its member interfaces.
@@ -94,4 +96,21 @@ type RouteIR struct {
 	Via         netip.Addr // zero value = none
 	Interface   string
 	Metric      uint32
+}
+
+// IDsIR is the resolved IDS/IPS configuration; nil when disabled.
+type IDsIR struct {
+	// Prevent selects inline NFQUEUE mode; false = passive detect.
+	Prevent bool
+	// Interfaces sniffed in detect mode.
+	Interfaces []string
+	HomeNets   []netip.Prefix
+	RuleFiles  []string
+	QueueNum   uint16
+}
+
+// TelemetryIR is the resolved telemetry configuration; nil when disabled.
+type TelemetryIR struct {
+	ClickHouseURL string
+	Database      string
 }

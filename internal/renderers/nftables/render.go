@@ -44,6 +44,12 @@ func Render(ir *compiler.IR) ([]byte, error) {
 
 	b.WriteString("\tchain forward {\n")
 	b.WriteString("\t\ttype filter hook forward priority filter; policy drop;\n")
+	// Inline IPS: every forwarded packet visits Suricata via NFQUEUE
+	// before policy evaluation (stream reassembly needs the whole flow).
+	// "bypass" fails open if Suricata is not consuming the queue.
+	if ir.IDs != nil && ir.IDs.Prevent {
+		fmt.Fprintf(&b, "\t\tcounter queue flags bypass to %d comment \"ips-inspect\"\n", ir.IDs.QueueNum)
+	}
 	b.WriteString("\t\tct state established,related accept\n")
 	b.WriteString("\t\tct state invalid drop\n")
 	for _, r := range ir.Rules {

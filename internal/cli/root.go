@@ -33,6 +33,7 @@ func NewRootCommand() *cobra.Command {
 		newRollbackCommand(&server),
 		newVersionsCommand(&server),
 		newAuditCommand(&server),
+		newAlertsCommand(&server),
 	)
 	return root
 }

@@ -8,6 +8,9 @@ syntax = "proto3";
 
 package openngfw.v1;
 
+import "openngfw/v1/ids.proto";
+import "openngfw/v1/telemetry.proto";
+
 option go_package = "github.com/detailtech/oss-ngfw/api/gen/openngfw/v1;openngfwv1";
 
 // Policy is the complete declarative configuration of one node.
@@ -18,6 +21,8 @@ message Policy {
   repeated Rule rules = 4;
   Nat nat = 5;
   repeated StaticRoute static_routes = 6;
+  Ids ids = 7;
+  Telemetry telemetry = 8;
 }
 
 // Zone groups interfaces into a security zone. Rules match on zone pairs.

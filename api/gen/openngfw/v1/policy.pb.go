@@ -146,6 +146,8 @@ type Policy struct {
 	Rules         []*Rule                `protobuf:"bytes,4,rep,name=rules,proto3" json:"rules,omitempty"`
 	Nat           *Nat                   `protobuf:"bytes,5,opt,name=nat,proto3" json:"nat,omitempty"`
 	StaticRoutes  []*StaticRoute         `protobuf:"bytes,6,rep,name=static_routes,json=staticRoutes,proto3" json:"static_routes,omitempty"`
+	Ids           *Ids                   `protobuf:"bytes,7,opt,name=ids,proto3" json:"ids,omitempty"`
+	Telemetry     *Telemetry             `protobuf:"bytes,8,opt,name=telemetry,proto3" json:"telemetry,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -218,6 +220,20 @@ func (x *Policy) GetNat() *Nat {
 func (x *Policy) GetStaticRoutes() []*StaticRoute {
 	if x != nil {
 		return x.StaticRoutes
+	}
+	return nil
+}
+
+func (x *Policy) GetIds() *Ids {
+	if x != nil {
+		return x.Ids
+	}
+	return nil
+}
+
+func (x *Policy) GetTelemetry() *Telemetry {
+	if x != nil {
+		return x.Telemetry
 	}
 	return nil
 }
@@ -883,14 +899,16 @@ var File_openngfw_v1_policy_proto protoreflect.FileDescriptor
 
 const file_openngfw_v1_policy_proto_rawDesc = "" +
 	"\n" +
-	"\x18openngfw/v1/policy.proto\x12\vopenngfw.v1\"\xa3\x02\n" +
+	"\x18openngfw/v1/policy.proto\x12\vopenngfw.v1\x1a\x15openngfw/v1/ids.proto\x1a\x1bopenngfw/v1/telemetry.proto\"\xfd\x02\n" +
 	"\x06Policy\x12'\n" +
 	"\x05zones\x18\x01 \x03(\v2\x11.openngfw.v1.ZoneR\x05zones\x122\n" +
 	"\taddresses\x18\x02 \x03(\v2\x14.openngfw.v1.AddressR\taddresses\x120\n" +
 	"\bservices\x18\x03 \x03(\v2\x14.openngfw.v1.ServiceR\bservices\x12'\n" +
 	"\x05rules\x18\x04 \x03(\v2\x11.openngfw.v1.RuleR\x05rules\x12\"\n" +
 	"\x03nat\x18\x05 \x01(\v2\x10.openngfw.v1.NatR\x03nat\x12=\n" +
-	"\rstatic_routes\x18\x06 \x03(\v2\x18.openngfw.v1.StaticRouteR\fstaticRoutes\"\\\n" +
+	"\rstatic_routes\x18\x06 \x03(\v2\x18.openngfw.v1.StaticRouteR\fstaticRoutes\x12\"\n" +
+	"\x03ids\x18\a \x01(\v2\x10.openngfw.v1.IdsR\x03ids\x124\n" +
+	"\ttelemetry\x18\b \x01(\v2\x16.openngfw.v1.TelemetryR\ttelemetry\"\\\n" +
 	"\x04Zone\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x1e\n" +
 	"\n" +
@@ -985,6 +1003,8 @@ var file_openngfw_v1_policy_proto_goTypes = []any{
 	(*SourceNat)(nil),      // 9: openngfw.v1.SourceNat
 	(*DestinationNat)(nil), // 10: openngfw.v1.DestinationNat
 	(*StaticRoute)(nil),    // 11: openngfw.v1.StaticRoute
+	(*Ids)(nil),            // 12: openngfw.v1.Ids
+	(*Telemetry)(nil),      // 13: openngfw.v1.Telemetry
 }
 var file_openngfw_v1_policy_proto_depIdxs = []int32{
 	3,  // 0: openngfw.v1.Policy.zones:type_name -> openngfw.v1.Zone
@@ -993,16 +1013,18 @@ var file_openngfw_v1_policy_proto_depIdxs = []int32{
 	7,  // 3: openngfw.v1.Policy.rules:type_name -> openngfw.v1.Rule
 	8,  // 4: openngfw.v1.Policy.nat:type_name -> openngfw.v1.Nat
 	11, // 5: openngfw.v1.Policy.static_routes:type_name -> openngfw.v1.StaticRoute
-	0,  // 6: openngfw.v1.Service.protocol:type_name -> openngfw.v1.Protocol
-	6,  // 7: openngfw.v1.Service.ports:type_name -> openngfw.v1.PortRange
-	1,  // 8: openngfw.v1.Rule.action:type_name -> openngfw.v1.Action
-	9,  // 9: openngfw.v1.Nat.source:type_name -> openngfw.v1.SourceNat
-	10, // 10: openngfw.v1.Nat.destination:type_name -> openngfw.v1.DestinationNat
-	11, // [11:11] is the sub-list for method output_type
-	11, // [11:11] is the sub-list for method input_type
-	11, // [11:11] is the sub-list for extension type_name
-	11, // [11:11] is the sub-list for extension extendee
-	0,  // [0:11] is the sub-list for field type_name
+	12, // 6: openngfw.v1.Policy.ids:type_name -> openngfw.v1.Ids
+	13, // 7: openngfw.v1.Policy.telemetry:type_name -> openngfw.v1.Telemetry
+	0,  // 8: openngfw.v1.Service.protocol:type_name -> openngfw.v1.Protocol
+	6,  // 9: openngfw.v1.Service.ports:type_name -> openngfw.v1.PortRange
+	1,  // 10: openngfw.v1.Rule.action:type_name -> openngfw.v1.Action
+	9,  // 11: openngfw.v1.Nat.source:type_name -> openngfw.v1.SourceNat
+	10, // 12: openngfw.v1.Nat.destination:type_name -> openngfw.v1.DestinationNat
+	13, // [13:13] is the sub-list for method output_type
+	13, // [13:13] is the sub-list for method input_type
+	13, // [13:13] is the sub-list for extension type_name
+	13, // [13:13] is the sub-list for extension extendee
+	0,  // [0:13] is the sub-list for field type_name
 }
 
 func init() { file_openngfw_v1_policy_proto_init() }
@@ -1010,6 +1032,8 @@ func file_openngfw_v1_policy_proto_init() {
 	if File_openngfw_v1_policy_proto != nil {
 		return
 	}
+	file_openngfw_v1_ids_proto_init()
+	file_openngfw_v1_telemetry_proto_init()
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
