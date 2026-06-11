@@ -83,6 +83,18 @@ func Compile(p *openngfwv1.Policy) (*IR, error) {
 	ir.IDs = ids
 	ir.Telemetry = compileTelemetry(p)
 
+	routing, err := compileRouting(p)
+	if err != nil {
+		return nil, err
+	}
+	ir.Routing = routing
+
+	vpn, err := compileVPN(p)
+	if err != nil {
+		return nil, err
+	}
+	ir.VPN = vpn
+
 	return ir, nil
 }
 

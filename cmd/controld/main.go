@@ -71,6 +71,9 @@ func run(grpcListen, httpListen, dataDir, logDir string, dryRun bool) error {
 			&engines.DryRun{EngineName: engines.RoutesName},
 			&engines.DryRun{EngineName: engines.SuricataName},
 			&engines.DryRun{EngineName: engines.VectorName},
+			&engines.DryRun{EngineName: engines.FRRName},
+			&engines.DryRun{EngineName: engines.StrongswanName},
+			&engines.DryRun{EngineName: engines.WireguardName},
 		)
 	} else {
 		suricata := &engines.Suricata{StateDir: filepath.Join(dataDir, "suricata"), LogDir: logDir}
@@ -82,6 +85,9 @@ func run(grpcListen, httpListen, dataDir, logDir string, dryRun bool) error {
 			&engines.Routes{StateDir: dataDir},
 			suricata,
 			vector,
+			&engines.FRR{},
+			&engines.Strongswan{},
+			&engines.Wireguard{StateDir: dataDir},
 		)
 	}
 

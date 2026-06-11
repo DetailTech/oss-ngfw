@@ -38,6 +38,8 @@ func Validate(p *openngfwv1.Policy) []string {
 	v.checkRoutes(p.GetStaticRoutes())
 	v.checkIDs(p.GetIds())
 	v.checkTelemetry(p.GetTelemetry())
+	v.checkRouting(p.GetRouting())
+	v.checkVPN(p.GetVpn())
 	return v.errs
 }
 

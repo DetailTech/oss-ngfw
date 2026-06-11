@@ -9,10 +9,13 @@ import (
 	openngfwv1 "github.com/detailtech/oss-ngfw/api/gen/openngfw/v1"
 	"github.com/detailtech/oss-ngfw/internal/compiler"
 	"github.com/detailtech/oss-ngfw/internal/engines"
+	"github.com/detailtech/oss-ngfw/internal/renderers/frr"
 	"github.com/detailtech/oss-ngfw/internal/renderers/iproute"
 	"github.com/detailtech/oss-ngfw/internal/renderers/nftables"
+	"github.com/detailtech/oss-ngfw/internal/renderers/strongswan"
 	"github.com/detailtech/oss-ngfw/internal/renderers/suricata"
 	"github.com/detailtech/oss-ngfw/internal/renderers/vector"
+	"github.com/detailtech/oss-ngfw/internal/renderers/wireguard"
 )
 
 // Options carries deployment-level paths the renderers embed in native
@@ -77,6 +80,24 @@ func RenderAll(p *openngfwv1.Policy, opts Options) (map[string][]byte, error) {
 		return nil, fmt.Errorf("render vector: %w", err)
 	}
 	out[engines.VectorName] = vec
+
+	frrConf, err := frr.Render(ir)
+	if err != nil {
+		return nil, fmt.Errorf("render frr: %w", err)
+	}
+	out[engines.FRRName] = frrConf
+
+	swan, err := strongswan.Render(ir)
+	if err != nil {
+		return nil, fmt.Errorf("render strongswan: %w", err)
+	}
+	out[engines.StrongswanName] = swan
+
+	wg, err := wireguard.Render(ir)
+	if err != nil {
+		return nil, fmt.Errorf("render wireguard: %w", err)
+	}
+	out[engines.WireguardName] = wg
 
 	return out, nil
 }

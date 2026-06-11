@@ -17,6 +17,8 @@ type IR struct {
 	Routes    []RouteIR
 	IDs       *IDsIR
 	Telemetry *TelemetryIR
+	Routing   *RoutingIR
+	VPN       *VPNIR
 }
 
 // ZoneIR is a zone with its member interfaces.
@@ -113,4 +115,75 @@ type IDsIR struct {
 type TelemetryIR struct {
 	ClickHouseURL string
 	Database      string
+}
+
+// RoutingIR is the resolved dynamic-routing configuration; nil when no
+// protocol is enabled.
+type RoutingIR struct {
+	BGP  *BGPIR
+	OSPF *OSPFIR
+}
+
+// BGPIR is the resolved BGP configuration.
+type BGPIR struct {
+	ASN       uint32
+	RouterID  string
+	Neighbors []BGPNeighborIR
+	Announce  []netip.Prefix
+}
+
+// BGPNeighborIR is one BGP peer.
+type BGPNeighborIR struct {
+	Address     netip.Addr
+	RemoteASN   uint32
+	Description string
+}
+
+// OSPFIR is the resolved OSPF configuration.
+type OSPFIR struct {
+	RouterID string
+	Areas    []OSPFAreaIR
+}
+
+// OSPFAreaIR is one OSPF area with its advertised networks.
+type OSPFAreaIR struct {
+	Area     string
+	Networks []netip.Prefix
+}
+
+// VPNIR is the resolved VPN configuration; nil when nothing is defined.
+type VPNIR struct {
+	IPsec     []IpsecIR
+	Wireguard []WireguardIR
+}
+
+// IpsecIR is one swanctl connection.
+type IpsecIR struct {
+	Name          string
+	LocalAddress  string
+	RemoteAddress string
+	LocalSubnets  []netip.Prefix
+	RemoteSubnets []netip.Prefix
+	PSKFile       string
+	IKEProposal   string
+	ESPProposal   string
+	Initiate      bool
+}
+
+// WireguardIR is one managed WireGuard interface.
+type WireguardIR struct {
+	Name           string
+	Address        netip.Prefix
+	ListenPort     uint16
+	PrivateKeyFile string
+	Peers          []WireguardPeerIR
+}
+
+// WireguardPeerIR is one WireGuard peer.
+type WireguardPeerIR struct {
+	Name       string
+	PublicKey  string
+	Endpoint   string
+	AllowedIPs []netip.Prefix
+	Keepalive  uint16
 }
