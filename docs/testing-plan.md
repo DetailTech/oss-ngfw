@@ -111,6 +111,12 @@ export NGFW_TOKEN=<token printed by the installer>
 
 # Telemetry backend (ClickHouse in Docker):
 sudo apt-get install -y docker.io docker-compose-v2
+# IMPORTANT: Docker sets the legacy iptables FORWARD policy to DROP,
+# which silently kills the firewall's *forwarded* traffic (both
+# netfilter hooks must accept). Re-allow forwarding after install:
+sudo iptables -P FORWARD ACCEPT
+echo -e '[Service]\nExecStartPost=/usr/sbin/iptables -P FORWARD ACCEPT' | \
+  sudo SYSTEMD_EDITOR=tee systemctl edit docker
 sudo docker compose -f deploy/compose/docker-compose.yaml up -d
 sudo docker compose -f deploy/compose/docker-compose.yaml exec -T clickhouse \
   clickhouse-client --multiquery < deploy/clickhouse/init.sql

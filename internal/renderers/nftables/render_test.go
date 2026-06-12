@@ -88,6 +88,9 @@ func TestGoldensPassNftCheck(t *testing.T) {
 	if err != nil {
 		t.Skip("nft not installed")
 	}
+	if os.Geteuid() != 0 {
+		t.Skip("nft -c needs netlink (root); kernel validation runs in the integration job")
+	}
 	goldens, _ := filepath.Glob(filepath.Join("testdata", "*.nft"))
 	if len(goldens) == 0 {
 		t.Fatal("no golden files")

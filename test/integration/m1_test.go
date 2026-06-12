@@ -70,6 +70,8 @@ func teardown() {
 	runQuiet("ip", "link", "del", "cveth0")
 	runQuiet("ip", "link", "del", "sveth0")
 	runQuiet("nft", "delete", "table", "inet", "openngfw")
+	runQuiet("iptables", "-D", "FORWARD", "-s", "10.100.0.0/16", "-j", "ACCEPT")
+	runQuiet("iptables", "-D", "FORWARD", "-d", "10.100.0.0/16", "-j", "ACCEPT")
 }
 
 func setupTopology(t *testing.T) {
@@ -99,6 +101,13 @@ func setupTopology(t *testing.T) {
 	run(t, "ip", "netns", "exec", serverNS, "ip", "route", "add", "default", "via", fwServer)
 
 	run(t, "sysctl", "-w", "net.ipv4.ip_forward=1")
+
+	// Docker hosts (GitHub runners included) set the legacy iptables
+	// FORWARD policy to DROP. Every netfilter hook must accept a
+	// forwarded packet, so allow the test subnets in that hook too —
+	// scoped tightly and removed in teardown.
+	runQuiet("iptables", "-I", "FORWARD", "1", "-s", "10.100.0.0/16", "-j", "ACCEPT")
+	runQuiet("iptables", "-I", "FORWARD", "1", "-d", "10.100.0.0/16", "-j", "ACCEPT")
 }
 
 // startEchoServer runs a TCP listener on serverIP:8080 inside the server
