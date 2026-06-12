@@ -9,9 +9,12 @@ what needs you" in the main plan first.
 > **Why OL9 differs from Ubuntu:** firewalld is enabled by default (it
 > would fight the managed ruleset), SELinux is enforcing, the default
 > kernel is UEK, several engines come from EPEL instead of the base
-> repos, strongSwan's swanctl tree lives under `/etc/strongswan/`, the
-> default user is `opc`, and `nc` is nmap's `ncat`. All of these are
-> handled below; `deploy/install.sh` auto-detects EL9.
+> repos — and Oracle's own EPEL mirror is a **subset** that lacks
+> suricata/strongswan, so the installer adds upstream Fedora EPEL plus
+> the CodeReady Builder repo. strongSwan's swanctl tree lives under
+> `/etc/strongswan/`, the default user is `opc`, and `nc` is nmap's
+> `ncat`. All of these are handled by `deploy/install.sh` (EL9
+> auto-detected).
 
 ---
 
@@ -134,7 +137,7 @@ applying these substitutions:
 | `nc -z -w2 HOST PORT` | `ncat -z -w2 HOST PORT` (or `timeout 2 bash -c '</dev/tcp/HOST/PORT'`) |
 | `echo X \| nc -w2 HOST PORT` | `echo X \| ncat -w2 HOST PORT` |
 | `nc -l -p 8080 -q 0` (server loop) | `ncat -l 8080` |
-| `apt-get install …` | `dnf install …` (Suricata/strongSwan/wireguard-tools come from EPEL — the installer set that up) |
+| `apt-get install …` | `dnf install …` (Suricata/strongSwan come from upstream EPEL + CRB — the installer set that up; Oracle's EPEL mirror alone is not enough) |
 | `suricata-update -o …` | same command (`sudo dnf install -y python3-suricata-update` if missing) |
 | netplan persistence (T-OPS-2) | already persistent via the `nmcli con add` profiles from §1.3 |
 | Docker FORWARD-policy warning | not applicable (podman) |

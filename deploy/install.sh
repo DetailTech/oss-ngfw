@@ -40,10 +40,18 @@ if [[ $FAMILY == debian ]]; then
   apt-get install -y -q nftables suricata frr wireguard-tools \
     strongswan-swanctl charon-systemd ethtool curl jq
 else
-  # Suricata, strongSwan, and wireguard-tools live in EPEL on EL9.
+  # Suricata and strongSwan live in EPEL on EL9 — and Oracle's EPEL
+  # mirror (ol9_developer_EPEL) is a *subset* that lacks both, so on OL
+  # we add upstream Fedora EPEL as well. EPEL packages also routinely
+  # need the CodeReady Builder repo for dependencies.
+  dnf install -y dnf-plugins-core
   if [[ $ID == ol ]]; then
-    dnf install -y oracle-epel-release-el9
+    dnf config-manager --set-enabled ol9_codeready_builder || true
+    dnf install -y oracle-epel-release-el9 || true
+    rpm -q epel-release >/dev/null 2>&1 || \
+      dnf install -y "https://dl.fedoraproject.org/pub/epel/epel-release-latest-9.noarch.rpm"
   else
+    dnf config-manager --set-enabled crb || true
     dnf install -y epel-release
   fi
   dnf install -y nftables frr suricata strongswan wireguard-tools ethtool curl jq tar
