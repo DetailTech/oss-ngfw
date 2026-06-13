@@ -233,8 +233,9 @@ Conventions: run `ngfwctl …` on the firewall (with `NGFW_TOKEN` set),
 | T5.1 | Add a `viewer` and an `operator` user to `/etc/openngfw/users.yaml`, restart controld | — |
 | T5.2 | `NGFW_TOKEN=<viewer> ngfwctl versions` / `… commit` | read works; commit → `PermissionDenied` |
 | T5.3 | `NGFW_TOKEN=<operator> ngfwctl commit -m x` (with a candidate) | works; `ngfwctl audit` shows the operator's **name** |
-| T5.4 | No/garbage token | `Unauthenticated` on both gRPC and `curl http://127.0.0.1:8080/v1/policy` |
-| T5.5 **(F)** | `ssh -L 8080:127.0.0.1:8080 ubuntu@<fw>` then browse `http://localhost:8080/ui/` | dashboard loads; paste a token; Policy/Versions/Audit/Alerts/Flows/Intel tabs all render real data |
+| T5.4 | No/garbage token | `Unauthenticated` on both gRPC and `curl -k https://127.0.0.1:8080/v1/policy` |
+| T5.5 **(F)** | `ssh -L 8080:127.0.0.1:8080 ubuntu@<fw>` then browse `https://localhost:8080/ui/` (accept the self-signed cert warning) | dashboard loads with live charts; ⌘K command palette works; Rules/Objects editing stages a candidate (yellow bar) → Validate → Commit records a version; Threats "block this source" and Traffic "rule from flow" prefill a rule; Changes shows version diff + rollback |
+| T5.5b **(F)** | Confirm TLS: first run generated `<data-dir>/tls/{cert,key}.pem`; `curl http://127.0.0.1:8080/ui/` is refused (HTTPS only). To use your own cert pass `--tls-cert/--tls-key`; `--tls=false` reverts to cleartext for debugging | self-signed HTTPS by default |
 | T5.6 | Check OIDC stance | it is scaffold-only by design (guardrail: needs human security review). Nothing to configure. |
 
 ### Phase 6 — Operational (gap G)
@@ -268,7 +269,9 @@ reference them by name, nothing else changes.
 1. **Input chain is `accept`** — the firewall filters *forwarded* traffic;
    host-input hardening (self zone) is future work. Use OCI security
    lists + SSH-from-your-IP for the bench.
-2. **API/UI have no TLS** and bind 127.0.0.1 — reach them via SSH tunnel.
+2. **API/UI serve HTTPS with a self-signed cert by default** (generated
+   under `<data-dir>/tls/`); they bind 127.0.0.1 — reach them via SSH
+   tunnel and accept the browser warning, or supply `--tls-cert/--tls-key`.
 3. Suricata/Vector run as controld children: a crashed engine is logged
    but not auto-restarted; a controld restart restarts everything.
 4. Single shared candidate (no per-user candidates).

@@ -27,8 +27,12 @@ agents live in [`CLAUDE.md`](CLAUDE.md).
 - **M4** — threat-intel federation with a license-aware feed registry
   enforced at commit time; nftables blocklist sets; app-labeled flows.
 - **M5** — local token auth + RBAC (viewer/operator/admin), audited
-  actors, read-first web UI at /ui/. OIDC is scaffold-only pending
-  security review.
+  actors, and a full management **web UI at `/ui/`** (HTTPS, self-signed
+  cert by default): dashboard with live charts, rule/object editing through
+  the candidate → validate → commit → rollback workflow, threat/flow
+  triage with one-click "block source"/"rule from flow" pivots, command
+  palette (⌘K), and a version/audit history. OIDC is scaffold-only pending
+  security review. See [`docs/webui-design.md`](docs/webui-design.md).
 
 Real-engine integration tests (`make integration-test`) prove filtering,
 NAT, rollback, IDS detection, and intel enforcement against live traffic

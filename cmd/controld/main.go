@@ -31,6 +31,7 @@ import (
 	"github.com/detailtech/oss-ngfw/internal/intel"
 	"github.com/detailtech/oss-ngfw/internal/renderers"
 	"github.com/detailtech/oss-ngfw/internal/store"
+	"github.com/detailtech/oss-ngfw/internal/tlsutil"
 	"github.com/detailtech/oss-ngfw/internal/version"
 	"github.com/detailtech/oss-ngfw/internal/webui"
 )
@@ -43,6 +44,9 @@ func main() {
 	logDir := flag.String("log-dir", "/var/log/openngfw", "engine log directory (eve.json)")
 	dryRun := flag.Bool("dry-run", false, "render and validate but never touch engines (dev/demo)")
 	usersFile := flag.String("users-file", "", "local API users file enabling token auth + RBAC (YAML; chmod 600)")
+	tlsEnabled := flag.Bool("tls", true, "serve the REST gateway/WebUI over HTTPS (self-signed cert generated under <data-dir>/tls if no cert/key given)")
+	tlsCert := flag.String("tls-cert", "", "PEM certificate for the REST gateway (enables operator-provided TLS instead of self-signed)")
+	tlsKey := flag.String("tls-key", "", "PEM private key for the REST gateway")
 	flag.Parse()
 
 	if *showVersion {
@@ -50,13 +54,30 @@ func main() {
 		return
 	}
 
-	if err := run(*grpcListen, *httpListen, *dataDir, *logDir, *usersFile, *dryRun); err != nil {
+	cfg := config{
+		grpcListen: *grpcListen, httpListen: *httpListen,
+		dataDir: *dataDir, logDir: *logDir, usersFile: *usersFile,
+		dryRun: *dryRun, tlsEnabled: *tlsEnabled, tlsCert: *tlsCert, tlsKey: *tlsKey,
+	}
+	if err := run(cfg); err != nil {
 		slog.Error("controld exited", "error", err)
 		os.Exit(1)
 	}
 }
 
-func run(grpcListen, httpListen, dataDir, logDir, usersFile string, dryRun bool) error {
+// config holds the resolved daemon flags.
+type config struct {
+	grpcListen, httpListen string
+	dataDir, logDir        string
+	usersFile              string
+	dryRun                 bool
+	tlsEnabled             bool
+	tlsCert, tlsKey        string
+}
+
+func run(cfg config) error {
+	grpcListen, httpListen := cfg.grpcListen, cfg.httpListen
+	dataDir, logDir, usersFile, dryRun := cfg.dataDir, cfg.logDir, cfg.usersFile, cfg.dryRun
 	if err := os.MkdirAll(dataDir, 0o755); err != nil {
 		return fmt.Errorf("create data dir: %w", err)
 	}
@@ -192,12 +213,39 @@ func run(grpcListen, httpListen, dataDir, logDir, usersFile string, dryRun bool)
 			mux.ServeHTTP(w, r)
 		}))
 		httpSrv = &http.Server{Addr: httpListen, Handler: root, ReadHeaderTimeout: 10 * time.Second}
+
+		var certFile, keyFile string
+		if cfg.tlsEnabled {
+			var selfSigned bool
+			certFile, keyFile, selfSigned, err = tlsutil.LoadOrCreate(dataDir, cfg.tlsCert, cfg.tlsKey)
+			if err != nil {
+				return fmt.Errorf("tls material: %w", err)
+			}
+			if selfSigned {
+				slog.Info("serving WebUI/REST over HTTPS with a self-signed certificate (browsers will warn until you supply --tls-cert/--tls-key)", "cert", certFile)
+			} else {
+				slog.Info("serving WebUI/REST over HTTPS with operator-provided certificate", "cert", certFile)
+			}
+		} else {
+			slog.Warn("TLS is DISABLED (--tls=false): WebUI/REST is served as cleartext HTTP — do not expose off-host")
+		}
+
 		go func() {
-			if err := httpSrv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-				errCh <- fmt.Errorf("http gateway: %w", err)
+			var serveErr error
+			if cfg.tlsEnabled {
+				serveErr = httpSrv.ListenAndServeTLS(certFile, keyFile)
+			} else {
+				serveErr = httpSrv.ListenAndServe()
+			}
+			if serveErr != nil && !errors.Is(serveErr, http.ErrServerClosed) {
+				errCh <- fmt.Errorf("http gateway: %w", serveErr)
 			}
 		}()
-		slog.Info("REST gateway started", "http", httpListen)
+		scheme := "https"
+		if !cfg.tlsEnabled {
+			scheme = "http"
+		}
+		slog.Info("REST gateway started", "url", scheme+"://"+httpListen+"/ui/")
 	}
 
 	sigCh := make(chan os.Signal, 1)
